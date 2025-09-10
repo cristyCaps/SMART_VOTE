@@ -17,7 +17,7 @@ import LiveResults from "./web/LiveResults";
 import ParticipationRate from "./web/ParticipationRate";
 import ReadMore from "./web/ReadMore";
 import ElectionInfo from "./web/ElectionInfo";
- 
+import Statistics from "./pages/Statistics";
 
 const App = () => {
   const location = useLocation();
@@ -46,17 +46,20 @@ const App = () => {
           <Route path="/filecandidacy" element={<CandidateForm />} />
           <Route path="/candidates" element={<Candidates />} />
           <Route path="/pending-application" element={<PendingApplication />} />
+          <Route path="/Statistics" element={<Statistics />} />
           {/* Web informational pages */}
           <Route path="/about" element={<About />} />
           <Route path="/features" element={<Features />} />
           <Route path="/elections/upcoming" element={<UpcomingElections />} />
           <Route path="/elections/past" element={<PastElections />} />
-          <Route path="/elections/candidates" element={<ElectionsCandidates />} />
+          <Route
+            path="/elections/candidates"
+            element={<ElectionsCandidates />}
+          />
           <Route path="/elections/info" element={<ElectionInfo />} />
           <Route path="/stats/live-results" element={<LiveResults />} />
           <Route path="/stats/participation" element={<ParticipationRate />} />
           <Route path="/readmore" element={<ReadMore />} />
-          
         </Routes>
       </div>
     </div>

@@ -183,14 +183,12 @@ export default function Sidebar() {
             </li>
             <li>
               <Link
-                to="/admin-dashboard"
+                to="/Statistics"
                 className={`w-full rounded-lg ${
                   collapsed
                     ? "px-0 py-2 bg-transparent hover:bg-transparent ring-0 shadow-none"
                     : "px-6 py-2 hover:bg-primary ring-1 ring-white/10 shadow-sm"
-                } ${
-                  isActive("/admin-dashboard") ? "bg-primary text-white" : ""
-                }`}
+                } ${isActive("/Statistics") ? "bg-primary text-white" : ""}`}
               >
                 <span
                   className={`flex items-center ${
