@@ -60,6 +60,8 @@ export default function CandidateForm({ enabled }) {
     position: "",
     advocacy: "",
     organization: "",
+    candidacyType: "",
+    partylistName: "",
   });
 
   const handleChange = (e) => {
@@ -77,13 +79,18 @@ export default function CandidateForm({ enabled }) {
     e.preventDefault();
     console.log(formData);
 
-    if (formData.position == "" || formData.advocacy == "") {
+    if (formData.position == "" || formData.advocacy == "" || formData.candidacyType == "") {
       toast.error("Fill up all fields!");
       return;
     }
 
     if (formData.organization === "") {
       toast.error("Please select an organization!");
+      return;
+    }
+
+    if (formData.candidacyType === "Partylist" && formData.partylistName === "") {
+      toast.error("Please enter your partylist name!");
       return;
     }
     try {
@@ -129,7 +136,7 @@ export default function CandidateForm({ enabled }) {
   }, []);
 
   return (
-    <div className="relative lg:m-h-screen h-screen">
+    <div className="relative lg:m-h-screen h-screen text-white">
       {loading && (
         <div className="absolute inset-0 z-30  bg-transparent  flex items-center justify-center">
           <Loaders />
@@ -140,7 +147,7 @@ export default function CandidateForm({ enabled }) {
 
       {!isOpenFiling ? (
         <div className="flex h-screen justify-center items-center ">
-          <div className="text-2xl font-bold">
+          <div className="text-2xl font-bold text-white">
             Filing Of Candidacy in not available
           </div>
         </div>
@@ -151,11 +158,11 @@ export default function CandidateForm({ enabled }) {
               loading ? "pointer-events-none opacity-40" : "opacity-100"
             }`}
           >
-            <div className="text-2xl font-bold">File Candidacy</div>
+            <div className="text-2xl font-bold text-black">File Candidacy</div>
             <form className="bg-white p-4 rounded shadow w-1/2 border">
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="block font-semibold mb-1">FirstName</label>
+                  <label className="block font-semibold mb-1 text-black">FirstName</label>
                   <input
                     type="text"
                     firstname="firstname"
@@ -167,7 +174,7 @@ export default function CandidateForm({ enabled }) {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold mb-1">LastName</label>
+                  <label className="block font-semibold mb-1 text-black">LastName</label>
                   <input
                     type="text"
                     lastname="lastname"
@@ -181,7 +188,7 @@ export default function CandidateForm({ enabled }) {
               </div>
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="block font-semibold mb-1">Email</label>
+                  <label className="block font-semibold mb-1 text-black">Email</label>
                   <input
                     type="text"
                     name="email"
@@ -193,7 +200,7 @@ export default function CandidateForm({ enabled }) {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold mb-1">Course</label>
+                  <label className="block font-semibold mb-1 text-black">Course</label>
                   <input
                     type="text"
                     name="course"
@@ -206,25 +213,56 @@ export default function CandidateForm({ enabled }) {
                 </div>
               </div>
 
-              <div className="mb-4">
-                <label className="block font-semibold mb-1">Position</label>
-                <select
-                  name="position"
-                  className="select select-bordered w-full"
-                  value={formData.position}
-                  onChange={handleChange}
-                  required
-                >
-                  <option value="">-- Select Position --</option>
-                  {position.map((item) => (
-                    <option key={item.id} value={item.value}>
-                      {item.value}
-                    </option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block font-semibold mb-1 text-black">Position</label>
+                  <select
+                    name="position"
+                    className="select select-bordered w-full"
+                    value={formData.position}
+                    onChange={handleChange}
+                    required
+                  >
+                    <option value="">-- Select Position --</option>
+                    {position.map((item) => (
+                      <option key={item.id} value={item.value}>
+                        {item.value}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1 text-black">Candidacy Type</label>
+                  <select
+                    name="candidacyType"
+                    className="select select-bordered w-full"
+                    value={formData.candidacyType}
+                    onChange={handleChange}
+                    required
+                  >
+                    <option value="">-- Select Candidacy Type --</option>
+                    <option value="Individual">Individual</option>
+                    <option value="Partylist">Partylist</option>
+                  </select>
+                </div>
               </div>
+
+              {formData.candidacyType === "Partylist" && (
+                <div className="mb-4">
+                  <label className="block font-semibold mb-1 text-black">Partylist Name</label>
+                  <input
+                    type="text"
+                    name="partylistName"
+                    className="input input-bordered w-full"
+                    value={formData.partylistName}
+                    onChange={handleChange}
+                    placeholder="Enter your partylist name"
+                    required
+                  />
+                </div>
+              )}
               <div className="mb-4">
-                <div className="font-semibold">Advocacy</div>
+                <div className="font-semibold text-black">Advocacy</div>
                 <textarea
                   name="advocacy"
                   value={userData.advocacy}
@@ -235,7 +273,7 @@ export default function CandidateForm({ enabled }) {
               </div>
 
               <div>
-                <label className="block font-semibold">Organization</label>
+                <label className="block font-semibold text-black">Organization</label>
                 <div className="flex space-x-4 mt-2">
                   {orgOptions.map((item) => (
                     <div
@@ -249,7 +287,7 @@ export default function CandidateForm({ enabled }) {
                       }`}
                       onClick={() => setSelected(item.value)}
                     >
-                      <span className="text-lg font-medium">{item.label}</span>
+                      <span className="text-lg font-medium text-black">{item.label}</span>
                       {selected === item.value && (
                         <FaCheck className="absolute top-1 right-1 text-blue-600 w-4 h-4" />
                       )}

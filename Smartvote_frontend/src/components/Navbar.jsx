@@ -173,20 +173,6 @@ const Navbar = () => {
           >
             About
           </Link>
-          {/* <Link
-            to="/homepage"
-            onClick={() => setMenuOpen(false)}
-            className="hover:text-accent"
-          >
-            Sign In
-          </Link> */}
-          <Link
-            to="/register"
-            onClick={() => setMenuOpen(false)}
-            className="hover:text-accent"
-          >
-            Sign Up
-          </Link>
         </div>
       </div>
 

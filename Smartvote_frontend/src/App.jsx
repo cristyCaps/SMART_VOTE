@@ -32,7 +32,7 @@ const App = () => {
     pathname.startsWith("/stats/");
 
   return (
-    <div className="flex flex-rown m-h-screen lg:h-screen">
+    <div className="flex flex-rown m-h-screen lg:h-screen bg-white">
       {/* Sidebar hidden on public web routes */}
       {!isPublicWebRoute && <Sidebar />}
 

@@ -240,7 +240,7 @@ export default function Candidates() {
   // console.log(filteredlength.length);
 
   return (
-    <div className="relative">
+    <div className="relative text-black">
       {/* <Sidebar/> */}
       {loading && (
         <div className="absolute inset-0 z-30  bg-transparent  flex items-center justify-center">
@@ -340,10 +340,10 @@ export default function Candidates() {
 
           {/* Table */}
           <div className="overflow-x-auto mt-6">
-            <div className="mb-2 text-lg font-bold">
+            <div className="mb-2 text-lg font-bold text-black ">
               {filterStatus} Candidates
             </div>
-            <table className="table w-full border rounded-lg">
+            <table className="table w-full border rounded-lg [&_th]:text-black [&_td]:text-black">
               <thead>
                 <tr>
                   <th>#</th>
