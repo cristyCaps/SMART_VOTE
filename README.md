@@ -20,12 +20,5 @@ SmartVote is a **web-based voting system** made for school elections such as **S
 * **Backend:** Node.js, 
 * **Database:** HeidiSQL + Firebase
 
-## 👥 Developers
 
-* Jessriel Metante
-* Joshua Catapan
-* Cristy Caparoso
-* Kylle Aliño
-
----
 
