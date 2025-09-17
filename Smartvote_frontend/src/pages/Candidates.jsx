@@ -3,9 +3,20 @@ import React, { useState, useEffect } from "react";
 import Sidebar from "../Sidebar";
 import { toast } from "react-toastify";
 import { Loaders } from "../utils/Loaders";
+import { useSearchParams, useNavigate } from "react-router-dom";
 // import CandidatesForm from "../components/CandidatesForm";
 
 export default function Candidates() {
+  // Simple role guard: prevent students from accessing admin Candidates page
+  const navigate = useNavigate();
+  try {
+    const rawUser = localStorage.getItem("userData");
+    const parsedUser = rawUser ? JSON.parse(rawUser) : null;
+    if (parsedUser && parsedUser.firstname !== "Admin") {
+      navigate("/user-dashboard");
+      return null;
+    }
+  } catch {}
   // const [formEnabled, setFormEnabled] = useState(false);
   // const [secretKey, setSecretKey] = useState("");
   // const [storedKey] = useState("12345"); // change this in real use
@@ -14,25 +25,65 @@ export default function Candidates() {
   const [isOpenFiling, setIsOpenFiling] = useState(false);
   const [endDate, setEndDate] = useState(null);
 
-  const getFilingStatus = async () => {
+  const getFilingStatus = async (dept) => {
     try {
       const response = await axios.get(
-        "http://localhost:3000/api/admin/getfilingstatus"
+        `http://localhost:3000/api/admin/getfilingstatus${dept ? `?dept=${encodeURIComponent(dept)}` : ""}`
       );
 
-      const openStatus = response.data?.status;
+      const data = response?.data || {};
+      const openStatus = data.status || "CLOSED";
+      const end = data.end_date || data.end_at || null;
 
-      setIsOpenFiling(openStatus === "OPEN");
-      setEndDate(formatToLocalIsoString(response.data?.end_date));
-      console.log(response.data);
+      const isOpen = openStatus === "OPEN";
+      const formattedEnd = end ? formatToLocalIsoString(end) : null;
+
+      // Check localStorage first to preserve state during navigation
+      let cachedState = null;
+      try {
+        const cached = localStorage.getItem(`filingStatus:${dept}`);
+        if (cached) cachedState = JSON.parse(cached);
+      } catch (e) {
+        console.error("Failed to parse cached filing status:", e);
+      }
+
+      // Prioritize locally stored OPEN state if deadline is in future
+      if (cachedState?.isOpen && cachedState.endDate && new Date(cachedState.endDate) > new Date()) {
+        setIsOpenFiling(true);
+        setEndDate(cachedState.endDate);
+      } else {
+        setIsOpenFiling(isOpen);
+        setEndDate(formattedEnd);
+      }
+
+      // Only update cache if server explicitly says OPEN with a valid end date
+      if (isOpen && formattedEnd) {
+        try {
+          localStorage.setItem(
+            `filingStatus:${dept}`,
+            JSON.stringify({ isOpen, endDate: formattedEnd })
+          );
+        } catch {}
+      } else if (!isOpen && (!cachedState?.isOpen || new Date(cachedState.endDate) <= new Date())) {
+        // If server says closed and local state is also closed or expired, clear local
+        try {
+          localStorage.removeItem(`filingStatus:${dept}`);
+        } catch {}
+      }
+      console.log("filing status:", data);
     } catch (error) {
       console.error("Error fetching filing status:", error);
-      alert("An error occurred while fetching the filing status.");
+      // Fallback to CLOSED if endpoint not ready or no record exists yet
+      setIsOpenFiling(false);
+      setEndDate(null);
+      try {
+        localStorage.removeItem(`filingStatus:${dept}`);
+      } catch {}
     }
   };
 
   useEffect(() => {
-    getFilingStatus();
+    // Filing status is loaded per department in a later effect once dept is known
   }, []);
 
   function formatDateTimeReadable(isoString) {
@@ -52,7 +103,16 @@ export default function Candidates() {
   }
 
   function formatToLocalIsoString(dateString) {
-    const date = new Date(dateString);
+    // Robustly parse MySQL-style "YYYY-MM-DD HH:mm:ss" or ISO strings to local time
+    let date;
+    if (typeof dateString === "string" && dateString.includes(" ")) {
+      const [d, t] = dateString.split(" ");
+      const [yyyy, MM, dd] = d.split("-").map((n) => parseInt(n, 10));
+      const [hh, mm, ss] = (t || "0:0:0").split(":").map((n) => parseInt(n, 10));
+      date = new Date(yyyy, (MM || 1) - 1, dd || 1, hh || 0, mm || 0, ss || 0);
+    } else {
+      date = new Date(dateString);
+    }
 
     const pad = (n) => String(n).padStart(2, "0");
 
@@ -72,6 +132,7 @@ export default function Candidates() {
     start_date: new Date().toISOString(),
     end_date: "",
     status: "OPEN",
+    department: "",
   });
 
   function toDatetimeLocal(value) {
@@ -111,6 +172,7 @@ export default function Candidates() {
           ...data,
           start_date: formatDateTimeReadable(data.start_date),
           end_date: formatDateTimeReadable(data.end_date),
+          department: selectedDept,
         },
         {
           headers: {
@@ -120,12 +182,18 @@ export default function Candidates() {
       );
 
       if (response.data.retVal === 1) {
-        setTimeout(() => {
-          setLoading(false);
-          toast.success("Filing of Candidacy is now offcially open.");
-          window.location.reload();
-        }, 3000);
-        window.location.reload();
+        setLoading(false);
+        toast.success("Filing of Candidacy is now offcially open.");
+        const formattedEnd = data.end_date ? formatToLocalIsoString(data.end_date) : null;
+        setIsOpenFiling(true);
+        setEndDate(formattedEnd);
+        try {
+          localStorage.setItem(
+            `filingStatus:${selectedDept}`,
+            JSON.stringify({ isOpen: true, endDate: formattedEnd })
+          );
+          localStorage.setItem("lastOpenFilingDept", selectedDept);
+        } catch {}
       } else {
         toast.error(response.data.resmsg);
       }
@@ -137,9 +205,7 @@ export default function Candidates() {
 
   // console.log(endDate);
 
-  const deadline = new Date("2025-08-30T18:12:54");
-
-  const [timeLeft, setTimeLeft] = useState(getTimeRemaining(deadline));
+  const [timeLeft, setTimeLeft] = useState({ total: 0, days: 0, hours: 0, minutes: 0, seconds: 0 });
 
   function getTimeRemaining(endTime) {
     const total = endTime - new Date();
@@ -151,19 +217,26 @@ export default function Candidates() {
   }
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const newTime = getTimeRemaining(deadline);
+    if (!endDate) {
+      setTimeLeft({ total: 0, days: 0, hours: 0, minutes: 0, seconds: 0 });
+      return;
+    }
+    const target = new Date(endDate);
+    const tick = () => {
+      const newTime = getTimeRemaining(target);
       if (newTime.total <= 0) {
-        clearInterval(interval);
+        setTimeLeft({ total: 0, days: 0, hours: 0, minutes: 0, seconds: 0 });
+        return;
       }
       setTimeLeft(newTime);
-    }, 1000);
-
+    };
+    // initial tick to avoid 1s delay
+    tick();
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [endDate]);
 
   //Get all candidates
-
   const [candidates, setCandidates] = useState([]);
   const getCandidates = async () => {
     try {
@@ -183,6 +256,11 @@ export default function Candidates() {
 
   const [loading, setLoading] = useState(false);
   const [remarks, setRemarks] = useState("");
+  const [showEditDeadline, setShowEditDeadline] = useState(false);
+  const [editEndDate, setEditEndDate] = useState("");
+  const [editSecretkey, setEditSecretkey] = useState("");
+  const [showCloseModal, setShowCloseModal] = useState(false);
+  const [closeSecretkey, setCloseSecretkey] = useState("");
   const handleActionFiledCoC = async (
     id,
     firstname,
@@ -227,11 +305,139 @@ export default function Candidates() {
     }
   };
 
+  const handleOpenEditDeadline = () => {
+    setEditEndDate(endDate ? toDatetimeLocal(endDate) : "");
+    setEditSecretkey("");
+    setShowEditDeadline(true);
+  };
+
+  const handleUpdateDeadline = async () => {
+    if (editSecretkey === "") {
+      toast.error("Secret key is required.");
+      return;
+    }
+    if (!editEndDate) {
+      toast.error("Please select a new deadline.");
+      return;
+    }
+    try {
+      setLoading(true);
+      const response = await axios.post(
+        "http://localhost:3000/api/admin/openfiling",
+        {
+          secretkey: editSecretkey,
+          admin_id: "testAdmin",
+          start_date: formatDateTimeReadable(new Date().toISOString()),
+          end_date: formatDateTimeReadable(new Date(editEndDate).toISOString()),
+          status: "OPEN",
+          department: selectedDept,
+        },
+        { headers: { "Content-Type": "application/json" } }
+      );
+      if (response.data.retVal === 1) {
+        toast.success("Deadline updated.");
+        setShowEditDeadline(false);
+        await getFilingStatus(selectedDept);
+      } else {
+        toast.error(response.data.resmsg || "Failed to update deadline.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Error updating deadline.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCloseFiling = () => {
+    setCloseSecretkey("");
+    setShowCloseModal(true);
+  };
+
+  const submitCloseFiling = async () => {
+    if (!closeSecretkey) {
+      toast.error("Secret key is required.");
+      return;
+    }
+    try {
+      setLoading(true);
+      const response = await axios.post(
+        "http://localhost:3000/api/admin/openfiling",
+        {
+          secretkey: closeSecretkey,
+          admin_id: "testAdmin",
+          start_date: formatDateTimeReadable(new Date().toISOString()),
+          end_date: formatDateTimeReadable(new Date().toISOString()),
+          status: "CLOSED",
+          department: selectedDept,
+        },
+        { headers: { "Content-Type": "application/json" } }
+      );
+      if (response.data.retVal === 1) {
+        toast.success("Filing closed.");
+        // Immediately stop timer and show form
+        setEndDate(null);
+        setTimeLeft({ total: 0, days: 0, hours: 0, minutes: 0, seconds: 0 });
+        setIsOpenFiling(false);
+        setShowCloseModal(false);
+        // Clear localStorage for this department
+        try {
+          localStorage.removeItem(`filingStatus:${selectedDept}`);
+        } catch {}
+        // Refresh from server to keep state in sync
+        await getFilingStatus(selectedDept);
+      } else {
+        toast.error(response.data.resmsg || "Failed to close filing.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Error closing filing.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const [filterStatus, setFilterStatus] = useState("Pending");
   const [selectedCandidate, setSelectedCandidate] = useState(null);
 
+  // Read department from query string or fallback to last opened dept
+  const [searchParams] = useSearchParams();
+  const queryDept = (searchParams.get("dept") || "").toUpperCase();
+  const lastOpenDept = (() => {
+    try { return (localStorage.getItem("lastOpenFilingDept") || "").toUpperCase(); } catch { return ""; }
+  })();
+  const selectedDept = (queryDept || lastOpenDept || "SSG").toUpperCase();
+
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem(`filingStatus:${selectedDept}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (typeof parsed?.isOpen === "boolean") setIsOpenFiling(parsed.isOpen);
+        if (parsed?.endDate) setEndDate(parsed.endDate);
+      } else {
+        setIsOpenFiling(false);
+        setEndDate(null);
+      }
+    } catch {}
+    getFilingStatus(selectedDept);
+  }, [selectedDept]);
+
+  // Department-specific filter: SSG → all students; CCS → BSIT only by request
+  function matchesDepartment(person) {
+    if (!person) return false;
+    const course = (person.course || "").toUpperCase();
+    const organization = (person.organization || "").toUpperCase();
+
+    if (selectedDept === "SSG") return true;
+    if (selectedDept === "CCS") return course === "BSIT";
+    if (organization === selectedDept) return true;
+
+    return false;
+  }
+
   const filteredCandidates = candidates.filter(
-    (person) => person.status == filterStatus
+    (person) => person.status == filterStatus && matchesDepartment(person)
   );
 
   // const lengthStus = candidates.filter(
@@ -240,7 +446,10 @@ export default function Candidates() {
   // console.log(filteredlength.length);
 
   return (
-    <div className="relative text-black">
+    <div
+      className="relative text-white
+    "
+    >
       {/* <Sidebar/> */}
       {loading && (
         <div className="absolute inset-0 z-30  bg-transparent  flex items-center justify-center">
@@ -252,41 +461,63 @@ export default function Candidates() {
           <div className="text-2xl font-bold mt-4">
             Filing Of Candidacy End in
           </div>
+          <div className="flex gap-3 mt-3">
+            <button className="btn btn-sm" onClick={handleOpenEditDeadline}>Edit Deadline</button>
+            <button className="btn btn-sm btn-error" onClick={handleCloseFiling}>Close Filing</button>
+          </div>
           <div className="grid grid-flow-col gap-5 text-center auto-cols-max mt-4 mb-4">
-            <div className="flex flex-col p-4 bg-neutral text-neutral-content rounded-box">
-              <span className="countdown font-mono text-2xl">
-                <span style={{ "--value": timeLeft.days }}>
+            <div className="flex flex-col p-4 bg-neutral text-white rounded-box">
+              <span className="countdown font-mono text-2xl text-white">
+                <span className="text-white" style={{ "--value": timeLeft.days }}>
                   {timeLeft.days}
                 </span>
               </span>
-              days
+              <span className="text-white">days</span>
             </div>
-            <div className="flex flex-col p-4 bg-neutral text-neutral-content rounded-box">
-              <span className="countdown font-mono text-xl">
-                <span style={{ "--value": timeLeft.hours }}>
+            <div className="flex flex-col p-4 bg-neutral text-white rounded-box">
+              <span className="countdown font-mono text-xl text-white">
+                <span className="text-white" style={{ "--value": timeLeft.hours }}>
                   {timeLeft.hours}
                 </span>
               </span>
-              hours
+              <span className="text-white">hours</span>
             </div>
-            <div className="flex flex-col p-4 bg-neutral text-neutral-content rounded-box">
-              <span className="countdown font-mono text-xl">
-                <span style={{ "--value": timeLeft.minutes }}>
+            <div className="flex flex-col p-4 bg-neutral text-white rounded-box">
+              <span className="countdown font-mono text-xl text-white">
+                <span className="text-white" style={{ "--value": timeLeft.minutes }}>
                   {timeLeft.minutes}
                 </span>
               </span>
-              min
+              <span className="text-white">min</span>
             </div>
-            <div className="flex flex-col p-4 bg-neutral text-neutral-content rounded-box">
-              <span className="countdown font-mono text-xl">
-                <span style={{ "--value": timeLeft.seconds }}>
+            <div className="flex flex-col p-4 bg-neutral text-white rounded-box">
+              <span className="countdown font-mono text-xl text-white">
+                <span className="text-white" style={{ "--value": timeLeft.seconds }}>
                   {timeLeft.seconds}
                 </span>
               </span>
-              sec
+              <span className="text-white">sec</span>
             </div>
           </div>
-
+          {showCloseModal && (
+            <div className="modal modal-open">
+              <div className="modal-box">
+                <h3 className="font-bold text-lg mb-2">Close Filing</h3>
+                <p className="mb-3">Are you sure you want to close filing?</p>
+                <input
+                  type="password"
+                  className="input input-bordered w-full mb-4 bg-white text-black placeholder-black"
+                  placeholder="Enter secret key"
+                  value={closeSecretkey}
+                  onChange={(e) => setCloseSecretkey(e.target.value)}
+                />
+                <div className="modal-action">
+                  <button className="btn" onClick={() => setShowCloseModal(false)}>Cancel</button>
+                  <button className="btn btn-error" onClick={submitCloseFiling}>Confirm</button>
+                </div>
+              </div>
+            </div>
+          )}
           {/* Open the modal using document.getElementById('ID').showModal() method */}
           {/* Filter Tabs */}
           <div className="flex flex-row justify-evenly gap-6 mb-4">
@@ -313,7 +544,7 @@ export default function Candidates() {
                   }`}
                   onClick={() => setFilterStatus(status)}
                 >
-                  <div className="stat-figure text-secondary">
+                  <div className="stat-figure text-black">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       fill="none"
@@ -328,7 +559,7 @@ export default function Candidates() {
                       ></path>
                     </svg>
                   </div>
-                  <div className="stat-title font-medium text-md">
+                  <div className="stat-title font-medium text-md text-black">
                     {status} Candidates
                   </div>
                   {/* <div className="stat-value">{filteredCandidates.length}</div> */}
@@ -341,7 +572,7 @@ export default function Candidates() {
           {/* Table */}
           <div className="overflow-x-auto mt-6">
             <div className="mb-2 text-lg font-bold text-black ">
-              {filterStatus} Candidates
+              {filterStatus} Candidates {selectedDept ? `- ${selectedDept}` : ""}
             </div>
             <table className="table w-full border rounded-lg [&_th]:text-black [&_td]:text-black">
               <thead>
@@ -427,7 +658,7 @@ export default function Candidates() {
               <form className="flex flex-col">
                 <textarea
                   name="remarks"
-                  className="textarea w-full"
+                  className="textarea w-full bg-white text-black placeholder-black"
                   placeholder="Remarks"
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
@@ -471,15 +702,43 @@ export default function Candidates() {
               </form>
             </div>
           </dialog>
+
+          {/* Edit Deadline Modal */}
+          {showEditDeadline && (
+            <div className="modal modal-open">
+              <div className="modal-box">
+                <h3 className="font-bold text-lg mb-2">Edit Filing Deadline</h3>
+                <div className="flex flex-col gap-3">
+                  <input
+                    type="password"
+                    className="input input-bordered w-full bg-black text-white placeholder-white"
+                    placeholder="Enter secret key"
+                    value={editSecretkey}
+                    onChange={(e) => setEditSecretkey(e.target.value)}
+                  />
+                  <input
+                    type="datetime-local"
+                    className="input input-bordered w-full bg-white text-black"
+                    value={editEndDate}
+                    onChange={(e) => setEditEndDate(e.target.value)}
+                  />
+                </div>
+                <div className="modal-action">
+                  <button className="btn" onClick={() => setShowEditDeadline(false)}>Cancel</button>
+                  <button className="btn btn-primary" onClick={handleUpdateDeadline}>Save</button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <>
-          <div className="max-w-2xl mx-auto p-4">
-            <h2 className="text-2xl font-bold mb-4">Candidate Filing</h2>
+          <div className="max-w-2xl mx-auto p-4 text-black">
+            <h2 className="text-2xl font-bold mb-4 text-black">Candidate Filing</h2>
 
             {/* Admin Controls */}
-            <div className="mb-6 bg-slate-100 p-4 rounded shadow-md">
-              <h3 className="text-lg font-semibold mb-2">Admin Controls</h3>
+            <div className="mb-6 bg-slate-100 p-4 rounded shadow-md text-black">
+              <h3 className="text-lg font-semibold mb-2 text-black">Admin Controls</h3>
               <input
                 type="text"
                 placeholder="Enter secret key"
@@ -489,7 +748,7 @@ export default function Candidates() {
                 onChange={handleChange}
               />
 
-              <label className="block mb-1 font-semibold">Set Deadline:</label>
+              <label className="block mb-1 font-semibold text-black">Set Deadline:</label>
               <input
                 type="datetime-local"
                 className="input input-bordered w-full"

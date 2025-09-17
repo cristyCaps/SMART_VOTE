@@ -10,10 +10,12 @@ export default function CandidateForm({ enabled }) {
 
   const [selected, setSelected] = useState("");
   const [org, setOrg] = useState(null);
+  const [deptOpen, setDeptOpen] = useState({ SSG: false });
   useEffect(() => {
     if (!userData?.course) return;
 
-    switch (userData.course) {
+    const course = String(userData.course).toUpperCase();
+    switch (course) {
       case "BSIT":
         setOrg("CCS");
         break;
@@ -21,24 +23,34 @@ export default function CandidateForm({ enabled }) {
       case "BSED":
         setOrg("CTE");
         break;
+      // Business/Economics related → CBE
       case "BSA":
+      case "BSBA":
+      case "BSAIS":
       case "BSAT":
+        setOrg("CBE");
+        break;
+      // Hotel/Tourism → HTM
       case "HM":
-        setOrg("CBA");
+      case "BSHM":
+        setOrg("HTM");
         break;
       case "PSYCHOLOGY":
-        setOrg("PSYCHOLOGY");
+        // Align with admin/DB key (historical typo used: PSHYCHOLOGY)
+        setOrg("PSHYCHOLOGY");
         break;
       case "CRIMINOLOGY":
         setOrg("CJE");
+        break;
       default:
         setOrg(null);
     }
   }, [userData?.course]);
 
+  // Only show organizations that are currently OPEN for filing
   const orgOptions = [
-    { id: 1, label: "SSG", value: "SSG" },
-    ...(org ? [{ id: 2, label: org, value: org }] : []),
+    ...(deptOpen.SSG ? [{ id: 1, label: "SSG", value: "SSG" }] : []),
+    ...(org && deptOpen[org] ? [{ id: 2, label: org, value: org }] : []),
   ];
 
   const position = [
@@ -74,6 +86,56 @@ export default function CandidateForm({ enabled }) {
       organization: selected,
     }));
   }, [selected]);
+
+  // Fetch department-specific filing status for SSG and user's college org
+  useEffect(() => {
+    const fetchDeptStatus = async (dept) => {
+      // Prefer cached OPEN state with valid future deadline to avoid flicker
+      try {
+        const cached = localStorage.getItem(`filingStatus:${dept}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed?.isOpen && parsed?.endDate && new Date(parsed.endDate) > new Date()) {
+            return true;
+          }
+        }
+      } catch {}
+
+      // Fallback to server status
+      try {
+        const res = await axios.get(
+          `http://localhost:3000/api/admin/getfilingstatus?dept=${encodeURIComponent(dept)}`
+        );
+        const status = (res?.data?.status || "CLOSED").toUpperCase();
+        return status === "OPEN";
+      } catch (e) {
+        return false;
+      }
+    };
+
+    const load = async () => {
+      const openSSG = await fetchDeptStatus("SSG");
+      let openOrg = false;
+      if (org && org !== "SSG") {
+        openOrg = await fetchDeptStatus(org);
+      }
+      setDeptOpen((prev) => ({ ...prev, SSG: openSSG, ...(org ? { [org]: openOrg } : {}) }));
+      // Default selection to first available open org
+      const available = [
+        ...(openSSG ? ["SSG"] : []),
+        ...(org && openOrg ? [org] : []),
+      ];
+      if (available.length > 0) {
+        setSelected((curr) => (available.includes(curr) ? curr : available[0]));
+      } else {
+        setSelected("");
+      }
+      // Control form availability: open if any dept open
+      setIsOpenFiling(openSSG || openOrg);
+    };
+
+    load();
+  }, [org]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -114,29 +176,9 @@ export default function CandidateForm({ enabled }) {
   };
 
   const [isOpenFiling, setIsOpenFiling] = useState(false);
-  const getFilingStatus = async () => {
-    try {
-      const response = await axios.get(
-        "http://localhost:3000/api/admin/getfilingstatus"
-      );
-
-      const openStatus = response.data?.status;
-
-      setIsOpenFiling(openStatus === "OPEN");
-
-      console.log(response.data);
-    } catch (error) {
-      // console.error("Error fetching filing status:", error);
-      alert("An error occurred while fetching the filing status.");
-    }
-  };
-
-  useEffect(() => {
-    getFilingStatus();
-  }, []);
 
   return (
-    <div className="relative lg:m-h-screen h-screen text-white">
+    <div className="relative lg:m-h-screen h-screen">
       {loading && (
         <div className="absolute inset-0 z-30  bg-transparent  flex items-center justify-center">
           <Loaders />
@@ -146,9 +188,9 @@ export default function CandidateForm({ enabled }) {
       {/* {isOpenFiling ? ( */}
 
       {!isOpenFiling ? (
-        <div className="flex h-screen justify-center items-center ">
-          <div className="text-2xl font-bold text-white">
-            Filing Of Candidacy in not available
+        <div className="flex h-screen justify-center items-center">
+          <div className="text-2xl font-bold text-black">
+            Filing Of Candidacy is not available
           </div>
         </div>
       ) : (

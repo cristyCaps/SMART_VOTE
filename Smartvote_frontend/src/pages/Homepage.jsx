@@ -135,7 +135,7 @@ export default function Homepage() {
 
       const navigateRoute =
         response.data[0].firstname == "Admin"
-          ? "/admin-dashoard"
+          ? "/admin-dashboard"
           : "/user-dashboard";
 
       if (response.data?.retVal === 0) {

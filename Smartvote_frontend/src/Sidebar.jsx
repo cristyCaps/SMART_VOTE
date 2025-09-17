@@ -17,6 +17,8 @@ export default function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
+  const [openElection, setOpenElection] = useState(false);
+  const [openCandidates, setOpenCandidates] = useState(false);
 
   let userData = null;
   try {
@@ -34,7 +36,9 @@ export default function Sidebar() {
   const isActive = (path) => location.pathname === path;
 
   const handleLogout = () => {
-    localStorage.clear();
+    try {
+      localStorage.removeItem("userData");
+    } catch {}
     navigate("/");
   };
 
@@ -59,13 +63,13 @@ export default function Sidebar() {
           <div className="flex flex-col items-center gap-4 mb-8">
             <FaUserCircle size={50} className="text-white" />
             <div>
-              <h2 className="text-lg font-bold leading-none text-center">
+              <h2 className="text-lg font-bold leading-none text-center text-white">
                 {userData.firstname} {userData.lastname}
               </h2>
-              <p className="text-xs text-white-500-bold text-center mt-2">
+              <p className="text-xs text-white text-center mt-2">
                 {userData.course} - {userData.year_level}
               </p>
-              <p className="text-sm text-white-500-bold ">{userData.email}</p>
+              <p className="text-sm text-white">{userData.email}</p>
             </div>
           </div>
         )}
@@ -90,14 +94,14 @@ export default function Sidebar() {
                   }`}
                   title="Admin Dashboard"
                 >
-                  <HiHome className="text-xl" />
-                  {!collapsed && <span>Admin Dashboard</span>}
+                  <HiHome className="text-xl text-white" />
+                  {!collapsed && <span className="text-white">Admin Dashboard</span>}
                 </span>
               </Link>
             </li>
             <li>
               <Link
-                to="/"
+                to="/admin-dashboard"
                 className={`w-full rounded-lg ${
                   collapsed
                     ? "px-0 py-2 bg-transparent hover:bg-transparent ring-0 shadow-none"
@@ -112,52 +116,108 @@ export default function Sidebar() {
                   }`}
                   title="Announcement"
                 >
-                  <HiBell className="text-xl" />
-                  {!collapsed && <span>Announcement</span>}
+                  <HiBell className="text-xl text-white" />
+                  {!collapsed && <span className="text-white">Announcement</span>}
                 </span>
               </Link>
             </li>
             <li>
-              <Link
-                to="/candidates"
+              <div
                 className={`w-full rounded-lg ${
                   collapsed
                     ? "px-0 py-2 bg-transparent hover:bg-transparent ring-0 shadow-none"
                     : "px-6 py-2 hover:bg-primary ring-1 ring-white/10 shadow-sm"
-                } ${isActive("/candidates") ? "bg-primary text-white" : ""}`}
-              >
-                <span
-                  className={`flex items-center ${
-                    collapsed ? "justify-center" : "gap-3"
-                  }`}
-                  title="Candidates"
-                >
-                  <HiUsers className="text-xl" />
-                  {!collapsed && <span>Candidates</span>}
-                </span>
-              </Link>
-            </li>
-            <li>
-              <Link
-                to="/"
-                className={`w-full rounded-lg ${
-                  collapsed
-                    ? "px-0 py-2 bg-transparent hover:bg-transparent ring-0 shadow-none"
-                    : "px-6 py-2 hover:bg-primary ring-1 ring-white/10 shadow-sm"
-                } ${
-                  isActive("/admin-dashboard") ? "bg-primary text-white" : ""
                 }`}
+                title="Candidates"
               >
-                <span
-                  className={`flex items-center ${
-                    collapsed ? "justify-center" : "gap-3"
-                  }`}
-                  title="Election"
-                >
-                  <HiClipboardCheck className="text-xl" />
-                  {!collapsed && <span>Election</span>}
-                </span>
-              </Link>
+                <div className={`flex items-center ${collapsed ? "justify-center" : "gap-3"}`}>
+                  <HiUsers className="text-xl text-white" />
+                  {!collapsed && (
+                    <>
+                      <Link to="/candidates" className="flex-1 text-white">
+                        Candidates
+                      </Link>
+                      <button
+                        type="button"
+                        className="ml-2 text-xs opacity-80 text-white px-2 py-1 rounded hover:bg-primary/70"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenCandidates((v) => !v);
+                        }}
+                        aria-label="Toggle Candidates"
+                      >
+                        {openCandidates ? "−" : "+"}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+              {!collapsed && openCandidates && (
+                <ul className="mt-2 ml-10 flex flex-col gap-1">
+                  {["SSG", "CCS", "CJE", "CBE", "PSHYCHOLOGY", "HTM", "CTE"].map((dept) => (
+                    <li key={dept}>
+                      <button
+                        onClick={() => navigate(`/candidates?dept=${encodeURIComponent(dept)}`)}
+                        className={`w-full text-left px-2 py-1 rounded hover:bg-primary/70`}
+                      >
+                        <span className="text-white">{dept}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+            <li>
+              <div
+                className={`w-full rounded-lg ${
+                  collapsed
+                    ? "px-0 py-2 bg-transparent hover:bg-transparent ring-0 shadow-none"
+                    : "px-6 py-2 hover:bg-primary ring-1 ring-white/10 shadow-sm"
+                }`}
+                title="Election"
+              >
+                <div className={`flex items-center ${collapsed ? "justify-center" : "gap-3"}`}>
+                  <HiClipboardCheck className="text-xl text-white" />
+                  {!collapsed && (
+                    <>
+                      <Link to="/election" className="flex-1 text-white">
+                        Election
+                      </Link>
+                      <button
+                        type="button"
+                        className="ml-2 text-xs opacity-80 text-white px-2 py-1 rounded hover:bg-primary/70"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenElection((v) => !v);
+                        }}
+                        aria-label="Toggle Election"
+                      >
+                        {openElection ? "−" : "+"}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+              {!collapsed && openElection && (
+                <ul className="mt-2 ml-10 flex flex-col gap-1">
+                  <li>
+                    <Link
+                      to="/election"
+                      className="w-full text-left px-2 py-1 rounded hover:bg-primary/70 block"
+                    >
+                      <span className="text-white">Manage Elections</span>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/candidates"
+                      className="w-full text-left px-2 py-1 rounded hover:bg-primary/70 block"
+                    >
+                      <span className="text-white">Candidate Filing</span>
+                    </Link>
+                  </li>
+                </ul>
+              )}
             </li>
             <li>
               <Link
@@ -176,8 +236,8 @@ export default function Sidebar() {
                   }`}
                   title="Leaderboards"
                 >
-                  <HiChartSquareBar className="text-xl" />
-                  {!collapsed && <span>Leaderboards</span>}
+                  <HiChartSquareBar className="text-xl text-white" />
+                  {!collapsed && <span className="text-white">Leaderboards</span>}
                 </span>
               </Link>
             </li>
@@ -196,8 +256,8 @@ export default function Sidebar() {
                   }`}
                   title="Results & Reports"
                 >
-                  <HiTrendingUp className="text-xl" />
-                  {!collapsed && <span>Results & Reports</span>}
+                  <HiTrendingUp className="text-xl text-white" />
+                  {!collapsed && <span className="text-white">Results & Reports</span>}
                 </span>
               </Link>
             </li>
@@ -213,7 +273,17 @@ export default function Sidebar() {
                     : ""
                 }`}
               >
-                {!collapsed && <span>Dashboard</span>}
+                {!collapsed && <span className="text-white">Dashboard</span>}
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/user-dashboard"
+                className={`hover:bg-base-300 flex items-center gap-3 ${
+                  isActive("/user-dashboard") ? "bg-primary text-white" : ""
+                }`}
+              >
+                {!collapsed && <span className="text-white">Election</span>}
               </Link>
             </li>
             <li>
@@ -225,7 +295,7 @@ export default function Sidebar() {
                     : ""
                 }`}
               >
-                {!collapsed && <span>Pending Application</span>}
+                {!collapsed && <span className="text-white">Pending Application</span>}
               </Link>
             </li>
           </ul>
@@ -238,8 +308,8 @@ export default function Sidebar() {
           className="btn btn-sm btn-error w-full flex justify-between items-center"
           onClick={handleLogout}
         >
-          {!collapsed && <span>Logout</span>}
-          <FaSignOutAlt />
+          {!collapsed && <span className="text-white">Logout</span>}
+          <FaSignOutAlt className="text-white" />
         </button>
       </div>
     </div>

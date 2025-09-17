@@ -1,4 +1,4 @@
-import { Route, Routes, useLocation } from "react-router-dom";
+import { Route, Routes, useLocation, Navigate } from "react-router-dom";
 import Register from "./Register";
 import Homepage from "./pages/Homepage";
 import Sidebar from "./Sidebar";
@@ -18,6 +18,9 @@ import ParticipationRate from "./web/ParticipationRate";
 import ReadMore from "./web/ReadMore";
 import ElectionInfo from "./web/ElectionInfo";
 import Statistics from "./pages/Statistics";
+import Election from "./pages/Election";
+import Voting from "./pages/Voting";
+import ElectionResults from "./pages/ElectionResults";
 
 const App = () => {
   const location = useLocation();
@@ -41,12 +44,78 @@ const App = () => {
           <Route path="/" element={<LandingPage />} />
           <Route path="/homepage" element={<Homepage />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/user-dashboard" element={<UserDashboard />} />
-          <Route path="/admin-dashboard" element={<AdminDashboard />} />
-          <Route path="/filecandidacy" element={<CandidateForm />} />
-          <Route path="/candidates" element={<Candidates />} />
-          <Route path="/pending-application" element={<PendingApplication />} />
-          <Route path="/Statistics" element={<Statistics />} />
+          <Route
+            path="/user-dashboard"
+            element={
+              <StudentOnly>
+                <UserDashboard />
+              </StudentOnly>
+            }
+          />
+          <Route
+            path="/admin-dashboard"
+            element={
+              <AdminOnly>
+                <AdminDashboard />
+              </AdminOnly>
+            }
+          />
+          <Route
+            path="/filecandidacy"
+            element={
+              <StudentOnly>
+                <CandidateForm />
+              </StudentOnly>
+            }
+          />
+          <Route
+            path="/candidates"
+            element={
+              <AdminOnly>
+                <Candidates />
+              </AdminOnly>
+            }
+          />
+          <Route
+            path="/pending-application"
+            element={
+              <StudentOnly>
+                <PendingApplication />
+              </StudentOnly>
+            }
+          />
+          <Route
+            path="/election"
+            element={
+              <AdminOnly>
+                <Election />
+              </AdminOnly>
+            }
+          />
+          <Route
+            path="/Statistics"
+            element={
+              <AdminOnly>
+                <Statistics />
+              </AdminOnly>
+            }
+          />
+          <Route
+            path="/voting/:electionId"
+            element={
+              <StudentOnly>
+                <Voting />
+              </StudentOnly>
+            }
+          />
+          <Route
+            path="/election-results/:electionId"
+            element={
+              <AdminOnly>
+                <ElectionResults />
+              </AdminOnly>
+            }
+          />
           {/* Web informational pages */}
           <Route path="/about" element={<About />} />
           <Route path="/features" element={<Features />} />
@@ -67,3 +136,29 @@ const App = () => {
 };
 
 export default App;
+
+// Inline route guards to keep users on their side even on refresh
+function getUser() {
+  try {
+    const raw = localStorage.getItem("userData");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function AdminOnly({ children }) {
+  const user = getUser();
+  if (!user || user.firstname !== "Admin") {
+    return <Navigate to="/user-dashboard" replace />;
+  }
+  return children;
+}
+
+function StudentOnly({ children }) {
+  const user = getUser();
+  if (user && user.firstname === "Admin") {
+    return <Navigate to="/admin-dashboard" replace />;
+  }
+  return children;
+}

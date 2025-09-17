@@ -5,6 +5,7 @@ const userRoutes = require("./routes/userRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const candidateRoutes = require("./routes/candidateRoutes");
 const votersRoutes = require("./routes/votersRoutes");
+const electionRoutes = require("./routes/electionRoutes");
 
 const cors = require("cors");
 const app = express();
@@ -15,6 +16,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/candidates", candidateRoutes);
 app.use("/api/voters", votersRoutes);
+app.use("/api/elections", electionRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
